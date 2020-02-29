@@ -834,6 +834,16 @@ struct cma_frame_allocator
         buf[1] = ptr + 1 * single_buffer_size;
         buf[2] = ptr + 2 * single_buffer_size;
         buf[3] = ptr + 3 * single_buffer_size;
+        // Write once to allocate physical memory to u-dma-buf virtual space.
+        // Note: Do not use memset() for this.
+        //       Because it does not work as expected.
+        {
+            uint64_t* word_ptr = reinterpret_cast<uint64_t*>(ptr);
+            size_t    words    = 4*single_buffer_size/sizeof(uint64_t);
+            for(int i = 0 ; i < words; i++) {
+                word_ptr[i] = 0;
+            }
+        }
     }
 
     void set_buffers_count(size_t count)
