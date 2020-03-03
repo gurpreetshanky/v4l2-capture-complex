@@ -555,6 +555,14 @@ struct simple_frame_allocator
 
     }
 
+    void sync_read_for_cpu(size_t index)
+    {
+    }
+
+    void sync_read_for_dev(size_t index)
+    {
+    }
+
     void aquire(size_t index, memory *mem, size_t num_mem)
     {
         for (size_t i = 0; i < num_mem; ++i) {
@@ -694,6 +702,7 @@ private:
                 buf.m.userptr = reinterpret_cast<unsigned long>(mem[0].start);
             }
 
+            m_allocator.sync_read_for_dev(buf.index);
             priv::xioctl(base::fd(), VIDIOC_QBUF, &buf);
         }
 
@@ -718,6 +727,8 @@ private:
 
         if (!priv::xioctl(base::fd(), VIDIOC_DQBUF, &buf))
             return false;
+
+        m_allocator.sync_read_for_cpu(buf.index);
 
         struct memory mem[format_descriptor::max_planes];
 
@@ -755,6 +766,7 @@ private:
             buf.m.userptr = reinterpret_cast<unsigned long>(mem[0].start);
         }
 
+        m_allocator.sync_read_for_dev(buf.index);
         priv::xioctl(base::fd(), VIDIOC_QBUF, &buf);
 
         return true;
@@ -792,6 +804,7 @@ static void mainloop(T& dev, unsigned int frame_count)
                 case v4l2::frame_status::Interrupt:
                     continue;
                 case v4l2::frame_status::Timeout:
+                    std::cout << fmt::format("TIMEOUT : {0}", count) << '\n';
                     return;
                 default:
                     break;
@@ -841,7 +854,7 @@ struct cma_frame_allocator
             uint64_t* word_ptr = reinterpret_cast<uint64_t*>(ptr);
             size_t    words    = 4*single_buffer_size/sizeof(uint64_t);
             for(int i = 0 ; i < words; i++) {
-                word_ptr[i] = 0;
+                  word_ptr[i] = 0;
             }
         }
     }
@@ -866,6 +879,20 @@ struct cma_frame_allocator
 
     }
 
+    void sync_read_for_cpu(size_t index)
+    {
+        dmabuf.sync_for_cpu(offsets[index],
+                            single_buffer_size,
+                            dmabuf.dma_from_device);
+    }
+  
+    void sync_read_for_dev(size_t index)
+    {
+        dmabuf.sync_for_dev(offsets[index],
+                            single_buffer_size,
+                            dmabuf.dma_from_device);
+    }
+  
     void aquire(size_t index, v4l2::memory *mem, size_t num_mem)
     {
         memset(mem, 0, num_mem*sizeof(*mem));
@@ -878,8 +905,6 @@ struct cma_frame_allocator
     void release(size_t index, v4l2::memory *mem, size_t num_mem)
     {
         // sync buffer
-        dmabuf.sync_for_cpu(offsets[index], single_buffer_size);
-
         // now, access them!
     }
 

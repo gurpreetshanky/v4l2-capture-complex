@@ -29,7 +29,14 @@ public:
         return std::ofstream(path);
     }
 
-    void sync_for_cpu(unsigned long offset, unsigned long length) const;
+    enum dma_direction_t {
+        dma_bidirectinal = 0,
+        dma_to_device    = 1,
+        dma_from_device  = 2
+    };
+
+    void sync_for_cpu(unsigned long offset, unsigned long length, dma_direction_t direction) const;
+    void sync_for_dev(unsigned long offset, unsigned long length, dma_direction_t direction) const;
 
     const void *get() const;
     void* get();

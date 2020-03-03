@@ -46,16 +46,31 @@ udmabuf::~udmabuf()
     ::close(m_fd);
 }
 
-void udmabuf::sync_for_cpu(unsigned long offset, unsigned long length) const
+void udmabuf::sync_for_cpu(unsigned long offset, unsigned long length, dma_direction_t direction) const
 {
     char attr[1024];
-    const unsigned long  sync_offset = offset;
-    const unsigned long  sync_size = length;
-    unsigned int   sync_direction = 1;
-    unsigned long  sync_for_cpu   = 1;
+    const unsigned int  sync_offset    = (unsigned int)(offset & 0xFFFFFFFF);
+    const unsigned int  sync_size      = (unsigned int)(length & 0xFFFFFFF0);
+    const unsigned int  sync_direction = (unsigned int)(direction << 2);
+    const unsigned int  sync_command   = 1;
     auto path = m_class_path + "/sync_for_cpu";
     if (int fd; (fd  = open(path.c_str(), O_WRONLY)) != -1) {
-        snprintf(attr, sizeof(attr), "0x%08X%08X", (sync_offset & 0xFFFFFFFF), (sync_size & 0xFFFFFFF0) | (sync_direction << 2) | sync_for_cpu);
+        snprintf(attr, sizeof(attr), "0x%08X%08X", sync_offset, (sync_size | sync_direction | sync_command));
+        write(fd, attr, strlen(attr));
+        close(fd);
+    }
+}
+
+void udmabuf::sync_for_dev(unsigned long offset, unsigned long length, dma_direction_t direction) const
+{
+    char attr[1024];
+    const unsigned int  sync_offset    = (unsigned int)(offset & 0xFFFFFFFF);
+    const unsigned int  sync_size      = (unsigned int)(length & 0xFFFFFFF0);
+    const unsigned int  sync_direction = (unsigned int)(direction << 2);
+    const unsigned int  sync_command   = 1;
+    auto path = m_class_path + "/sync_for_device";
+    if (int fd; (fd  = open(path.c_str(), O_WRONLY)) != -1) {
+        snprintf(attr, sizeof(attr), "0x%08X%08X", sync_offset, (sync_size | sync_direction | sync_command));
         write(fd, attr, strlen(attr));
         close(fd);
     }
